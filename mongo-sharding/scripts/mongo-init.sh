@@ -15,17 +15,10 @@ MONGO
 
 sleep 2
 
-echo "== 2/5 инициализация shard1 с репликами"
-docker compose exec -T shard1-1 mongosh --port 27018 --quiet <<'MONGO'
+echo "== 2/5 инициализация shard1"
+docker compose exec -T shard1 mongosh --port 27018 --quiet <<'MONGO'
 try {
-  rs.initiate({ 
-    _id: "shard1", 
-    members: [
-      { _id: 0, host: "shard1-1:27018" },
-      { _id: 1, host: "shard1-2:27018" },
-      { _id: 2, host: "shard1-3:27018" }
-    ] 
-  });
+  rs.initiate({ _id: "shard1", members: [{ _id: 0, host: "shard1:27018" }] });
 } catch (e) {
   print("shard1 уже инициализирован: " + e.codeName);
 }
@@ -33,17 +26,10 @@ MONGO
 
 sleep 2
 
-echo "== 3/5 инициализация shard2 с репликами"
-docker compose exec -T shard2-1 mongosh --port 27019 --quiet <<'MONGO'
+echo "== 3/5 инициализация shard2"
+docker compose exec -T shard2 mongosh --port 27019 --quiet <<'MONGO'
 try {
-  rs.initiate({ 
-    _id: "shard2", 
-    members: [
-      { _id: 0, host: "shard2-1:27019" },
-      { _id: 1, host: "shard2-2:27019" },
-      { _id: 2, host: "shard2-3:27019" }
-    ] 
-  });
+  rs.initiate({ _id: "shard2", members: [{ _id: 0, host: "shard2:27019" }] });
 } catch (e) {
   print("shard2 уже инициализирован: " + e.codeName);
 }
@@ -51,22 +37,10 @@ MONGO
 
 sleep 2
 
-echo "== ожидаем выборов PRIMARY в обеих группах"
-for pair in shard1-1:27018 shard2-1:27019; do
-  svc=${pair%%:*}; port=${pair##*:}
-  until docker compose exec -T "$svc" mongosh --port "$port" --quiet \
-        --eval 'rs.status().members.some(m => m.stateStr == "PRIMARY") ? 0 : quit(1)' \
-        >/dev/null 2>&1; do
-    sleep 1
-  done
-  echo "   $svc: PRIMARY избран"
-done
-
-
 echo "== 4/5 регистрация шардов и шардирование коллекции"
 docker compose exec -T mongos_router mongosh --port 27020 --quiet <<'MONGO'
-sh.addShard("shard1/shard1-1:27018,shard1-2:27018,shard1-3:27018");
-sh.addShard("shard2/shard2-1:27019,shard2-2:27019,shard2-3:27019");
+sh.addShard("shard1/shard1:27018");
+sh.addShard("shard2/shard2:27019");
 
 sh.enableSharding("somedb");
 sh.shardCollection("somedb.helloDoc", { name: "hashed" });
